@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conductor</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f0f4f8;
+      color: #1a202c;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #1a365d;
+      color: #fff;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    header h1   { font-size: 1.1rem; font-weight: 600; letter-spacing: 0.5px; }
+    header .sub { font-size: 0.8rem; color: #90cdf4; }
+    #session-badge {
+      margin-left: auto;
+      font-size: 0.75rem;
+      padding: 3px 10px;
+      border-radius: 12px;
+      background: #2c5282;
+      color: #e2e8f0;
+      display: none;
+    }
+
+    #setup-panel {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .setup-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 40px 48px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+      width: 520px;
+      max-width: 95vw;
+    }
+    .setup-card h2 { font-size: 1.15rem; color: #1a365d; margin-bottom: 6px; }
+    .setup-card p  { font-size: 0.85rem; color: #667; margin-bottom: 28px; line-height: 1.5; }
+    label { display: block; font-size: 0.85rem; font-weight: 600; color: #334; margin-bottom: 6px; }
+
+    select {
+      width: 100%;
+      border: 1.5px solid #c8d6e5;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 0.9rem;
+      outline: none;
+      color: #334;
+      background: #fff;
+      margin-bottom: 6px;
+    }
+    select:focus { border-color: #1a365d; }
+    .hint { font-size: 0.78rem; color: #667; margin-bottom: 28px; line-height: 1.4; }
+
+    #start-btn {
+      width: 100%;
+      background: #1a365d;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    #start-btn:hover { background: #2c5282; }
+    #setup-error { color: #c0392b; font-size: 0.83rem; margin-top: 12px; display: none; }
+
+    #chat-panel {
+      flex: 1;
+      display: none;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    #status-strip {
+      background: #1a365d;
+      padding: 7px 20px;
+      min-height: 34px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    #status-strip .label { font-size: 0.75rem; color: #90cdf4; }
+    #status-indicator {
+      font-size: 0.75rem;
+      padding: 2px 10px;
+      border-radius: 10px;
+      font-weight: 600;
+      display: none;
+    }
+    #status-indicator.running  { background: #d69e2e; color: #fff; animation: pulse 1.2s infinite; }
+    #status-indicator.calling  { background: #3182ce; color: #fff; animation: pulse 1.2s infinite; }
+    #status-indicator.done     { background: #38a169; color: #fff; animation: none; }
+    @keyframes pulse {
+      0%,100% { opacity: 1; }
+      50%      { opacity: 0.55; }
+    }
+
+    #agent-count { margin-left: auto; font-size: 0.72rem; color: #90cdf4; display: none; }
+
+    #body-split { flex: 1; display: flex; min-height: 0; }
+
+    #messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    /* Activity panel */
+    #activity-panel {
+      width: 320px;
+      flex-shrink: 0;
+      background: #0f2137;
+      border-left: 1px solid #2c5282;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    #activity-header {
+      padding: 10px 14px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: #90cdf4;
+      border-bottom: 1px solid #2c5282;
+      flex-shrink: 0;
+    }
+    #activity-log { flex: 1; overflow-y: auto; padding: 10px 0; }
+    .activity-row {
+      padding: 6px 14px;
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .activity-row:hover { background: rgba(255,255,255,0.04); }
+    .activity-icon { font-size: 0.85rem; flex-shrink: 0; margin-top: 1px; }
+    .activity-body { flex: 1; min-width: 0; }
+    .activity-label { font-size: 0.78rem; color: #e2e8f0; line-height: 1.4; word-break: break-word; }
+    .activity-time  { font-size: 0.68rem; color: #4a7fa5; margin-top: 2px; }
+    .activity-row.phase    .activity-label { color: #90cdf4; font-weight: 700; }
+    .activity-row.library  .activity-label { color: #a0aec0; }
+    .activity-row.calling  .activity-label { color: #63b3ed; }
+    .activity-row.done     .activity-label { color: #68d391; }
+    .activity-row.save     .activity-label { color: #f6e05e; }
+    .activity-row.saved    .activity-label { color: #9ae6b4; font-size: 0.72rem; }
+    .activity-row.error    .activity-label { color: #fc8181; }
+    .activity-row.creating .activity-label { color: #f6ad55; font-weight: 600; }
+    .activity-row.created  .activity-label { color: #b794f4; font-weight: 700; }
+    .activity-row.project  .activity-label { color: #f6ad55; font-weight: 600; }
+    .activity-row.projected .activity-label { color: #68d391; font-weight: 700; }
+
+    .msg {
+      max-width: 84%;
+      padding: 12px 16px;
+      border-radius: 12px;
+      line-height: 1.6;
+      font-size: 0.9rem;
+    }
+    .msg.agent {
+      align-self: flex-start;
+      background: #fff;
+      border: 1px solid #dde6ef;
+      border-bottom-left-radius: 4px;
+    }
+    .msg.user {
+      align-self: flex-end;
+      background: #1a365d;
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+    .msg.system {
+      align-self: center;
+      background: #edf2f7;
+      border: 1px dashed #a0aec0;
+      color: #4a5568;
+      font-size: 0.82rem;
+      max-width: 65%;
+      text-align: center;
+    }
+    .msg.specialist {
+      align-self: center;
+      background: #ebf8ff;
+      border: 1px solid #90cdf4;
+      color: #2b6cb0;
+      font-size: 0.82rem;
+      max-width: 65%;
+      text-align: center;
+    }
+    .msg.error {
+      align-self: center;
+      background: #fff5f5;
+      border: 1px solid #fc8181;
+      color: #c53030;
+      font-size: 0.85rem;
+    }
+
+    .msg.agent h1,.msg.agent h2,.msg.agent h3 { font-size: 0.95rem; font-weight: 700; margin: 10px 0 4px; }
+    .msg.agent p    { margin-bottom: 8px; }
+    .msg.agent ul   { padding-left: 18px; margin-bottom: 8px; }
+    .msg.agent ol   { padding-left: 18px; margin-bottom: 8px; }
+    .msg.agent li   { margin-bottom: 3px; }
+    .msg.agent code {
+      background: #f7fafc;
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 0.85em;
+      font-family: "Consolas", monospace;
+    }
+    .msg.agent pre code { display: block; padding: 10px; overflow-x: auto; white-space: pre; }
+    .msg.agent table { border-collapse: collapse; width: 100%; font-size: 0.85rem; margin: 8px 0; }
+    .msg.agent th, .msg.agent td { border: 1px solid #e2e8f0; padding: 5px 10px; text-align: left; }
+    .msg.agent th { background: #f7fafc; font-weight: 600; }
+    .msg.agent strong { font-weight: 700; }
+    .msg.agent em     { font-style: italic; }
+    .msg.agent .flagged { color: #fc8181; font-weight: 700; font-family: "Consolas", monospace; }
+
+    .thinking {
+      align-self: flex-start;
+      display: flex;
+      gap: 5px;
+      padding: 10px 14px;
+      background: #fff;
+      border: 1px solid #dde6ef;
+      border-radius: 12px;
+      border-bottom-left-radius: 4px;
+    }
+    .thinking span {
+      width: 7px; height: 7px;
+      background: #a0aec0;
+      border-radius: 50%;
+      animation: bounce 1.2s infinite;
+    }
+    .thinking span:nth-child(2) { animation-delay: 0.2s; }
+    .thinking span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bounce {
+      0%,80%,100% { transform: translateY(0); }
+      40%          { transform: translateY(-6px); }
+    }
+
+    #input-area {
+      padding: 14px 20px;
+      background: #fff;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    #user-input {
+      flex: 1;
+      border: 1.5px solid #c8d6e5;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 0.95rem;
+      outline: none;
+      margin-bottom: 0;
+    }
+    #user-input:focus    { border-color: #1a365d; }
+    #user-input:disabled { background: #f7fafc; color: #aaa; }
+    #send-btn {
+      background: #1a365d;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+    #send-btn:hover:not(:disabled) { background: #2c5282; }
+    #send-btn:disabled { background: #a0aec0; cursor: default; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Conductor</h1>
+    <div class="sub">Local Multi-Agent AI Orchestrator</div>
+  </div>
+  <div id="session-badge"></div>
+</header>
+
+<div id="setup-panel">
+  <div class="setup-card">
+    <h2>Route a Task to a Specialist</h2>
+    <p>Describe your task and Conductor will analyze the AgentLibrary,
+       select the right specialist agent(s), confirm the routing plan with you,
+       execute each specialist, and synthesize a final answer.
+       If no specialist exists, Conductor creates one on the spot.</p>
+
+    <label for="preset-select">Model / Cost</label>
+    <select id="preset-select">
+      <option value="full">Full &mdash; Opus 4 Conductor + Sonnet 4.6 Specialists &mdash; ~$0.20-0.80 (recommended)</option>
+      <option value="economy">Economy &mdash; Sonnet 4.6 for all &mdash; ~$0.05-0.20 per task</option>
+    </select>
+    <div class="hint">
+      Full uses Opus 4 for routing and Sonnet 4.6 for specialists &mdash; recommended for real tasks.
+      Economy uses Sonnet 4.6 everywhere and is good for testing.
+    </div>
+
+    <button id="start-btn">Start Session</button>
+    <div id="setup-error"></div>
+  </div>
+</div>
+
+<div id="chat-panel">
+  <div id="status-strip">
+    <span class="label">Status:</span>
+    <span id="status-indicator"></span>
+    <span id="agent-count"></span>
+  </div>
+  <div id="body-split">
+    <div id="messages"></div>
+    <div id="activity-panel">
+      <div id="activity-header">Agent Activity</div>
+      <div id="activity-log"></div>
+    </div>
+  </div>
+  <div id="input-area">
+    <input type="text" id="user-input" placeholder="Waiting for Conductor..." disabled autocomplete="off">
+    <button id="send-btn" disabled>Send</button>
+  </div>
+</div>
+
+<script>
+  const setupPanel      = document.getElementById('setup-panel');
+  const chatPanel       = document.getElementById('chat-panel');
+  const messages        = document.getElementById('messages');
+  const statusIndicator = document.getElementById('status-indicator');
+  const agentCount      = document.getElementById('agent-count');
+  const userInput       = document.getElementById('user-input');
+  const sendBtn         = document.getElementById('send-btn');
+  const sessionBadge    = document.getElementById('session-badge');
+  const activityLog     = document.getElementById('activity-log');
+
+  let waitingForInput = false;
+  let thinkingEl      = null;
+
+  function addActivity(cssClass, icon, label) {
+    const now  = new Date();
+    const time = now.toTimeString().slice(0, 8);
+    const row  = document.createElement('div');
+    row.className = `activity-row ${cssClass}`;
+    row.innerHTML = `
+      <div class="activity-icon">${icon}</div>
+      <div class="activity-body">
+        <div class="activity-label">${label}</div>
+        <div class="activity-time">${time}</div>
+      </div>`;
+    activityLog.appendChild(row);
+    activityLog.scrollTop = activityLog.scrollHeight;
+  }
+
+  function addMessage(type, html) {
+    removeThinking();
+    const div = document.createElement('div');
+    div.className = `msg ${type}`;
+    div.innerHTML = html;
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
+    return div;
+  }
+
+  function addThinking() {
+    removeThinking();
+    thinkingEl = document.createElement('div');
+    thinkingEl.className = 'thinking';
+    thinkingEl.innerHTML = '<span></span><span></span><span></span>';
+    messages.appendChild(thinkingEl);
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  function removeThinking() {
+    if (thinkingEl) { thinkingEl.remove(); thinkingEl = null; }
+  }
+
+  function setInputEnabled(enabled) {
+    waitingForInput    = enabled;
+    userInput.disabled = !enabled;
+    sendBtn.disabled   = !enabled;
+    userInput.placeholder = enabled ? 'Type your reply...' : 'Waiting for Conductor...';
+    if (enabled) userInput.focus();
+  }
+
+  function setStatus(cssClass, label) {
+    statusIndicator.textContent   = label;
+    statusIndicator.className     = cssClass;
+    statusIndicator.style.display = cssClass ? 'inline-block' : 'none';
+  }
+
+  document.getElementById('start-btn').addEventListener('click', async () => {
+    const preset = document.getElementById('preset-select').value;
+    const errEl  = document.getElementById('setup-error');
+    errEl.style.display = 'none';
+    document.getElementById('start-btn').disabled    = true;
+    document.getElementById('start-btn').textContent = 'Starting...';
+
+    const resp = await fetch('/start', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({preset})
+    });
+    const data = await resp.json();
+
+    if (data.error) {
+      errEl.textContent   = data.error;
+      errEl.style.display = 'block';
+      document.getElementById('start-btn').disabled    = false;
+      document.getElementById('start-btn').textContent = 'Start Session';
+      return;
+    }
+
+    setupPanel.style.display = 'none';
+    chatPanel.style.display  = 'flex';
+    sessionBadge.textContent  = `${data.preset} (${data.cost})`;
+    sessionBadge.style.display = 'block';
+
+    addMessage('system', `Conductor started &mdash; <strong>${data.preset}</strong> (${data.cost})`);
+    addActivity('phase', '\u{1F680}', `Session started — ${data.preset}`);
+    addThinking();
+    connectSSE();
+  });
+
+  function connectSSE() {
+    const es = new EventSource('/events');
+
+    es.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'ping') return;
+
+      if (msg.type === 'agent_message') {
+        removeThinking();
+        addMessage('agent', marked.parse(msg.text));
+        addActivity('phase', '\u{1F9E0}', 'Conductor responded');
+      }
+      else if (msg.type === 'tool_start') {
+        setStatus('running', msg.label || 'Working...');
+        addThinking();
+        if (msg.tool === 'list_agents') {
+          addActivity('library', '\u{1F4DA}', 'Reading AgentLibrary...');
+        } else if (msg.tool === 'write_file') {
+          addActivity('save', '\u{1F4BE}', msg.label || 'Saving file...');
+        } else {
+          addActivity('library', '⚙️', msg.label || msg.tool);
+        }
+      }
+      else if (msg.type === 'tool_done') {
+        setStatus('done', msg.label || 'Done');
+        if (msg.tool === 'list_agents') {
+          agentCount.style.display = 'inline';
+          addActivity('done', '✅', msg.label || 'Library loaded');
+        } else if (msg.tool === 'write_file') {
+          addActivity('saved', '\u{1F4C4}', msg.label || 'File saved');
+        } else {
+          addActivity('done', '✅', msg.label || 'Done');
+        }
+      }
+      else if (msg.type === 'specialist_start') {
+        const name = msg.agent || 'specialist';
+        setStatus('calling', `Calling ${name}...`);
+        addMessage('specialist', `Routing to <strong>${name}</strong>...`);
+        addThinking();
+        addActivity('calling', '\u{1F916}', `Calling ${name}...`);
+      }
+      else if (msg.type === 'specialist_done') {
+        const name = msg.agent || 'specialist';
+        setStatus('done', `${name} responded`);
+        addActivity('done', '✅', `${name} responded`);
+      }
+      else if (msg.type === 'create_agent_start') {
+        const name = msg.agent || 'new-agent';
+        setStatus('running', msg.label || `Creating ${name}...`);
+        addThinking();
+        addActivity('creating', '\u{1F528}', msg.label || `Creating ${name}...`);
+      }
+      else if (msg.type === 'create_agent_done') {
+        setStatus('done', msg.label || 'Agent created');
+        addActivity('created', '⭐', msg.label || 'Agent saved to library');
+      }
+      else if (msg.type === 'project_start') {
+        setStatus('running', msg.label || 'Creating project...');
+        addThinking();
+        addActivity('project', '\u{1F4C1}', msg.label || 'Creating project...');
+      }
+      else if (msg.type === 'project_done') {
+        setStatus('done', msg.label || 'Project created');
+        addActivity('projected', '✅', (msg.label || 'Project created') + (msg.path ? ` — ${msg.path}` : ''));
+      }
+      else if (msg.type === 'waiting_input') {
+        removeThinking();
+        setInputEnabled(true);
+        addActivity('phase', '⏳', 'Waiting for your reply');
+      }
+      else if (msg.type === 'session_done') {
+        removeThinking();
+        setStatus('', '');
+        addMessage('system', 'Session complete. Reload to start a new task.');
+        addActivity('done', '\u{1F3C1}', 'Session complete');
+        setInputEnabled(false);
+        es.close();
+      }
+      else if (msg.type === 'error') {
+        removeThinking();
+        addMessage('error', `Error: ${msg.message}`);
+        addActivity('error', '❌', msg.message);
+        setInputEnabled(false);
+        es.close();
+      }
+    };
+
+    es.onerror = () => {
+      removeThinking();
+      addMessage('error', 'Connection lost. Refresh to reconnect.');
+      es.close();
+    };
+  }
+
+  async function sendReply() {
+    if (!waitingForInput) return;
+    const text = userInput.value.trim();
+    userInput.value = '';
+    setInputEnabled(false);
+    addMessage('user', text || '(no input)');
+    addThinking();
+    await fetch('/reply', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({message: text})
+    });
+  }
+
+  sendBtn.addEventListener('click', sendReply);
+  userInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendReply(); });
+</script>
+
+</body>
+</html>
