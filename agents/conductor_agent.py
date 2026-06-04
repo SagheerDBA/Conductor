@@ -24,6 +24,7 @@ import config
 from tools.library_reader import (
     list_agents, call_specialist, write_file, create_agent, create_project
 )
+from tools.gmail_tool import search_gmail, read_email_thread
 
 TODAY = date.today().strftime("%Y-%m-%d")
 
@@ -142,6 +143,30 @@ CLAUDE.md format:
   ## FILE MAP
   ## HOW TO USE
 
+=== GMAIL ACCESS ===
+Two Gmail tools are available at the Conductor level for any session:
+
+  search_gmail       -- search messages by Gmail query syntax
+  read_email_thread  -- read all messages in a thread (plain text)
+
+Account routing:
+  "work"     -- sagheeremail.wrk@gmail.com  (SQL alerts, tickets, team emails, monitoring)
+  "personal" -- sagheeremail@gmail.com      (personal topics)
+  When unclear, default to "work" for any infrastructure or database topic.
+
+Use these tools BEFORE calling specialists whenever email context would help:
+  - Error alerts received about a specific server or database
+  - Ticket threads from a monitoring system or colleague
+  - Checking whether a known issue was previously reported
+  - Gathering timeline context around an incident
+
+Always call search_gmail first to find the relevant thread_id, then
+read_email_thread to get full content. Pass the email body text as part of
+the prepared_task when it is relevant to a specialist.
+
+Do NOT call these tools for general questions that have nothing to do with email.
+These are context-gathering tools, not a substitute for specialist analysis.
+
 === FALLBACK: NO MATCHING AGENT ===
 If no agent fits AND the domain is too narrow for a permanent specialist:
 "No specialist in AgentLibrary covers this task.
@@ -219,6 +244,40 @@ TOOLS = [
         },
     },
     {
+        "name": "search_gmail",
+        "description": (
+            "Search Gmail for messages matching a query. "
+            "Use 'work' account for SQL/infrastructure topics, 'personal' for personal topics. "
+            "Returns subject, sender, date, thread_id, and message_id for each result. "
+            "Call this first to find a thread_id, then use read_email_thread for full content."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "account":     {"type": "string", "enum": ["personal", "work"]},
+                "query":       {"type": "string", "description": "Gmail search syntax"},
+                "max_results": {"type": "integer", "default": 10},
+            },
+            "required": ["account", "query"],
+        },
+    },
+    {
+        "name": "read_email_thread",
+        "description": (
+            "Read the full content of an email thread. "
+            "Returns all messages with from/date/subject and plain-text body. "
+            "Use thread_id from search_gmail results."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "account":   {"type": "string", "enum": ["personal", "work"]},
+                "thread_id": {"type": "string"},
+            },
+            "required": ["account", "thread_id"],
+        },
+    },
+    {
         "name": "create_project",
         "description": (
             "Scaffolds a new project workspace under WORKSPACE_ROOT. "
@@ -259,6 +318,17 @@ def _dispatch_tool(tool_name, tool_input):
             tool_input["category"],
             tool_input["agent_slug"],
             tool_input["yaml_content"],
+        )
+    elif tool_name == "search_gmail":
+        result = search_gmail(
+            tool_input["account"],
+            tool_input["query"],
+            tool_input.get("max_results", 10),
+        )
+    elif tool_name == "read_email_thread":
+        result = read_email_thread(
+            tool_input["account"],
+            tool_input["thread_id"],
         )
     elif tool_name == "create_project":
         result = create_project(
@@ -339,6 +409,28 @@ def run(output_fn=None, input_fn=None, status_fn=None):
                     result_data = json.loads(content)
                     display = result_data.get("display_name", slug)
                     status_fn({"type": "create_agent_done", "agent": slug, "label": f"{display} created"})
+
+                elif tc.name == "search_gmail":
+                    acct  = tc.input.get("account", "work")
+                    query = tc.input.get("query", "")
+                    status_fn({"type": "tool_start", "tool": "search_gmail",
+                               "label": f"Searching {acct} Gmail: {query[:60]}..."})
+                    content = _dispatch_tool(tc.name, tc.input)
+                    result_data = json.loads(content)
+                    count = result_data.get("count", 0)
+                    status_fn({"type": "tool_done", "tool": "search_gmail",
+                               "label": f"Found {count} email(s)"})
+
+                elif tc.name == "read_email_thread":
+                    acct      = tc.input.get("account", "work")
+                    thread_id = tc.input.get("thread_id", "")
+                    status_fn({"type": "tool_start", "tool": "read_email_thread",
+                               "label": f"Reading {acct} Gmail thread {thread_id[:12]}..."})
+                    content = _dispatch_tool(tc.name, tc.input)
+                    result_data = json.loads(content)
+                    msg_count = result_data.get("message_count", 0)
+                    status_fn({"type": "tool_done", "tool": "read_email_thread",
+                               "label": f"Thread read ({msg_count} message(s))"})
 
                 elif tc.name == "create_project":
                     folder = tc.input.get("folder_name", "project")
