@@ -1,25 +1,35 @@
 """
-Conductor -- session.py
+Orchestrator -- session.py
 
-Runs the Conductor agent in a background thread so Flask can stream
-responses via SSE without blocking.
+Runs the Orchestrator agent in a background thread so Flask can stream
+responses to the browser via SSE without blocking.
+
+Uses the same two-queue pattern as AgentFactory:
+  _out : agent -> browser  (messages, tool events, waiting-for-input signal)
+  _in  : browser -> agent  (user replies)
 """
 
 import queue
 import threading
 
-from agents import conductor_agent
+from agents import orchestrator_agent
 
 
-class ConductorSession:
+class OrchestratorSession:
 
     def __init__(self):
-        self._out         = queue.Queue()
-        self._in          = queue.Queue()
-        self._thread      = None
-        self.done         = False
-        self._waiting     = False
-        self._last_output = ""
+        self._out              = queue.Queue()
+        self._in               = queue.Queue()
+        self._thread           = None
+        self.done              = False
+        self._waiting          = False
+        self._last_output      = ""
+        self._stop_requested   = False
+
+    def request_stop(self):
+        self._stop_requested = True
+        # Unblock any pending input_fn wait so the loop can exit
+        self._in.put("__stop__")
 
     def start(self):
         self._thread = threading.Thread(target=self._run, daemon=True)
@@ -53,12 +63,16 @@ class ConductorSession:
     def _status_fn(self, event: dict):
         self._out.put(event)
 
+    def _stop_fn(self) -> bool:
+        return self._stop_requested
+
     def _run(self):
         try:
-            conductor_agent.run(
+            orchestrator_agent.run(
                 output_fn=self._output_fn,
                 input_fn=self._input_fn,
                 status_fn=self._status_fn,
+                stop_fn=self._stop_fn,
             )
         except Exception as e:
             self._out.put({"type": "error", "message": str(e)})

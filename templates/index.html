@@ -3,41 +3,115 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Conductor</title>
+  <title>Orchestrator</title>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --header-h: 58px;
+      --status-h: 32px;
+      --input-h:  56px;
+    }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       background: #f0f4f8;
       color: #1a202c;
       height: 100vh;
+      overflow: hidden;
       display: flex;
       flex-direction: column;
     }
 
+    /* ── HEADER ── */
     header {
+      height: var(--header-h);
       background: #1a365d;
       color: #fff;
-      padding: 12px 24px;
       display: flex;
       align-items: center;
-      gap: 12px;
+      padding: 0 20px;
+      gap: 14px;
       flex-shrink: 0;
     }
-    header h1   { font-size: 1.1rem; font-weight: 600; letter-spacing: 0.5px; }
-    header .sub { font-size: 0.8rem; color: #90cdf4; }
+    .app-icon   { font-size: 1.3rem; }
+    .app-title h1   { font-size: 1rem; font-weight: 700; }
+    .app-title .sub { font-size: 0.72rem; color: #90cdf4; }
+    #cost-badge {
+      font-size: 0.72rem;
+      padding: 3px 10px;
+      border-radius: 10px;
+      background: #1c4532;
+      color: #9ae6b4;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    #stop-btn {
+      padding: 5px 14px;
+      background: #742a2a;
+      color: #fed7d7;
+      border: 1px solid #fc8181;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    #stop-btn:hover:not(:disabled) { background: #c53030; }
+    #stop-btn:disabled { background: #4a5568; color: #718096; border-color: #4a5568; cursor: default; }
+
+    #reset-btn {
+      margin-left: 10px;
+      padding: 5px 14px;
+      background: #2c5282;
+      color: #e2e8f0;
+      border: 1px solid #4a7fa5;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    #reset-btn:hover { background: #3182ce; }
+
     #session-badge {
       margin-left: auto;
-      font-size: 0.75rem;
-      padding: 3px 10px;
+      font-size: 0.73rem;
+      padding: 3px 12px;
       border-radius: 12px;
       background: #2c5282;
       color: #e2e8f0;
       display: none;
     }
 
+    /* ── STATUS STRIP ── */
+    #status-strip {
+      height: var(--status-h);
+      background: #2d3748;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 10px;
+      flex-shrink: 0;
+      display: none;
+    }
+    #status-strip .lbl { font-size: 0.7rem; color: #90cdf4; }
+    #status-indicator {
+      font-size: 0.7rem;
+      padding: 2px 9px;
+      border-radius: 10px;
+      font-weight: 700;
+      display: none;
+    }
+    #status-indicator.running  { background: #d69e2e; color: #fff; animation: pulse 1.1s infinite; }
+    #status-indicator.calling  { background: #3182ce; color: #fff; animation: pulse 1.1s infinite; }
+    #status-indicator.done     { background: #38a169; color: #fff; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+    #spec-count { margin-left: auto; font-size: 0.7rem; color: #90cdf4; display: none; }
+
+    /* ── SETUP PANEL ── */
     #setup-panel {
       flex: 1;
       display: flex;
@@ -47,169 +121,251 @@
     .setup-card {
       background: #fff;
       border-radius: 12px;
-      padding: 40px 48px;
+      padding: 36px 44px;
       box-shadow: 0 4px 24px rgba(0,0,0,0.10);
       width: 520px;
       max-width: 95vw;
     }
-    .setup-card h2 { font-size: 1.15rem; color: #1a365d; margin-bottom: 6px; }
-    .setup-card p  { font-size: 0.85rem; color: #667; margin-bottom: 28px; line-height: 1.5; }
-    label { display: block; font-size: 0.85rem; font-weight: 600; color: #334; margin-bottom: 6px; }
-
-    select {
+    .setup-card h2 { font-size: 1.1rem; color: #1a365d; margin-bottom: 6px; }
+    .setup-card p  { font-size: 0.84rem; color: #555; margin-bottom: 22px; line-height: 1.55; }
+    .setup-card label { display: block; font-size: 0.82rem; font-weight: 700; color: #333; margin-bottom: 5px; }
+    .setup-card select {
       width: 100%;
       border: 1.5px solid #c8d6e5;
-      border-radius: 8px;
-      padding: 10px 14px;
-      font-size: 0.9rem;
+      border-radius: 7px;
+      padding: 9px 12px;
+      font-size: 0.88rem;
       outline: none;
-      color: #334;
+      color: #333;
       background: #fff;
       margin-bottom: 6px;
     }
-    select:focus { border-color: #1a365d; }
-    .hint { font-size: 0.78rem; color: #667; margin-bottom: 28px; line-height: 1.4; }
-
+    .setup-card select:focus { border-color: #1a365d; }
+    .hint { font-size: 0.76rem; color: #666; margin-bottom: 22px; line-height: 1.4; }
     #start-btn {
       width: 100%;
       background: #1a365d;
       color: #fff;
       border: none;
-      border-radius: 8px;
-      padding: 12px;
-      font-size: 1rem;
-      font-weight: 600;
+      border-radius: 7px;
+      padding: 11px;
+      font-size: 0.95rem;
+      font-weight: 700;
       cursor: pointer;
-      transition: background 0.2s;
+      transition: background 0.15s;
     }
     #start-btn:hover { background: #2c5282; }
-    #setup-error { color: #c0392b; font-size: 0.83rem; margin-top: 12px; display: none; }
+    #setup-error { color: #c53030; font-size: 0.82rem; margin-top: 10px; display: none; }
 
-    #chat-panel {
-      flex: 1;
+    /* ── WORK AREA ── */
+    #work-area {
       display: none;
       flex-direction: column;
-      min-height: 0;
+      flex: 1;
+      overflow: hidden;
     }
 
-    #status-strip {
-      background: #1a365d;
-      padding: 7px 20px;
-      min-height: 34px;
+    /* ── SPECIALIST SECTION (top) ── */
+    #specialist-section {
+      flex: 55 0 0;
+      min-height: 60px;
+      display: flex;
+      flex-direction: column;
+      border-bottom: 2px solid #cbd5e0;
+      overflow: hidden;
+      background: #f8fafc;
+    }
+
+    #spec-section-header {
+      padding: 5px 16px;
+      background: #edf2f7;
+      border-bottom: 1px solid #e2e8f0;
       display: flex;
       align-items: center;
       gap: 10px;
       flex-shrink: 0;
     }
-    #status-strip .label { font-size: 0.75rem; color: #90cdf4; }
-    #status-indicator {
-      font-size: 0.75rem;
-      padding: 2px 10px;
-      border-radius: 10px;
-      font-weight: 600;
-      display: none;
-    }
-    #status-indicator.running  { background: #d69e2e; color: #fff; animation: pulse 1.2s infinite; }
-    #status-indicator.calling  { background: #3182ce; color: #fff; animation: pulse 1.2s infinite; }
-    #status-indicator.done     { background: #38a169; color: #fff; animation: none; }
-    @keyframes pulse {
-      0%,100% { opacity: 1; }
-      50%      { opacity: 0.55; }
-    }
-
-    #agent-count { margin-left: auto; font-size: 0.72rem; color: #90cdf4; display: none; }
-
-    #body-split { flex: 1; display: flex; min-height: 0; }
-
-    #messages {
-      flex: 1;
-      overflow-y: auto;
-      padding: 20px 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-      min-width: 0;
-    }
-
-    /* Activity panel */
-    #activity-panel {
-      width: 320px;
-      flex-shrink: 0;
-      background: #0f2137;
-      border-left: 1px solid #2c5282;
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
-    }
-    #activity-header {
-      padding: 10px 14px;
+    #spec-section-header .title {
       font-size: 0.72rem;
       font-weight: 700;
-      letter-spacing: 0.8px;
+      letter-spacing: 0.6px;
       text-transform: uppercase;
-      color: #90cdf4;
-      border-bottom: 1px solid #2c5282;
+      color: #4a5568;
+    }
+    #spec-section-header .hint {
+      font-size: 0.71rem;
+      color: #a0aec0;
+      font-style: italic;
+    }
+
+    #specialist-grid {
+      flex: 1;
+      display: flex;
+      overflow-x: scroll;   /* always visible so it never overlaps other controls */
+      overflow-y: hidden;
+      background: #f8fafc;
+    }
+    #specialist-grid::-webkit-scrollbar        { height: 8px; }
+    #specialist-grid::-webkit-scrollbar-track  { background: #e2e8f0; }
+    #specialist-grid::-webkit-scrollbar-thumb  { background: #a0aec0; border-radius: 4px; }
+    #specialist-grid::-webkit-scrollbar-thumb:hover { background: #718096; }
+
+    #specialist-empty {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #a0aec0;
+      font-size: 0.82rem;
+      font-style: italic;
+    }
+
+    .spec-panel {
+      flex: 0 0 340px;   /* fixed 340px — 5 panels = 1700px, overflows most monitors -> scroll */
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #e2e8f0;
+      overflow: hidden;
+    }
+    .spec-panel:last-child { border-right: none; }
+
+    .spec-header {
+      padding: 6px 10px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      flex-shrink: 0;
+      gap: 6px;
+    }
+    .spec-header-left  { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .spec-name         { font-size: 0.8rem; font-weight: 700; color: #fff; }
+    .spec-subtitle {
+      font-size: 0.61rem;
+      color: rgba(255,255,255,0.70);
+      font-style: italic;
+      line-height: 1.3;
+      margin-top: 1px;
+    }
+    .spec-status {
+      font-size: 0.63rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      white-space: nowrap;
       flex-shrink: 0;
     }
-    #activity-log { flex: 1; overflow-y: auto; padding: 10px 0; }
-    .activity-row {
-      padding: 6px 14px;
-      display: flex;
-      gap: 8px;
-      align-items: flex-start;
-      border-bottom: 1px solid rgba(255,255,255,0.04);
+    .spec-status.calling { background: rgba(255,255,255,0.9); color: #2b6cb0; animation: pulse 1.1s infinite; }
+    .spec-status.done    { background: rgba(255,255,255,0.9); color: #276749; }
+    .spec-status.error   { background: rgba(255,255,255,0.9); color: #c53030; }
+
+    .spec-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 10px;
+      font-size: 0.78rem;
+      line-height: 1.55;
+      background: #fff;
+      color: #2d3748;
     }
-    .activity-row:hover { background: rgba(255,255,255,0.04); }
-    .activity-icon { font-size: 0.85rem; flex-shrink: 0; margin-top: 1px; }
-    .activity-body { flex: 1; min-width: 0; }
-    .activity-label { font-size: 0.78rem; color: #e2e8f0; line-height: 1.4; word-break: break-word; }
-    .activity-time  { font-size: 0.68rem; color: #4a7fa5; margin-top: 2px; }
-    .activity-row.phase    .activity-label { color: #90cdf4; font-weight: 700; }
-    .activity-row.library  .activity-label { color: #a0aec0; }
-    .activity-row.calling  .activity-label { color: #63b3ed; }
-    .activity-row.done     .activity-label { color: #68d391; }
-    .activity-row.save     .activity-label { color: #f6e05e; }
-    .activity-row.saved    .activity-label { color: #9ae6b4; font-size: 0.72rem; }
-    .activity-row.error    .activity-label { color: #fc8181; }
-    .activity-row.creating .activity-label { color: #f6ad55; font-weight: 600; }
-    .activity-row.created  .activity-label { color: #b794f4; font-weight: 700; }
-    .activity-row.project  .activity-label { color: #f6ad55; font-weight: 600; }
-    .activity-row.projected .activity-label { color: #68d391; font-weight: 700; }
+    .spec-body::-webkit-scrollbar      { width: 3px; }
+    .spec-body::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 3px; }
+
+    /* markdown in spec panels */
+    .spec-body h1,.spec-body h2,.spec-body h3 { font-size: 0.8rem; font-weight: 700; margin: 7px 0 3px; color: #1a202c; }
+    .spec-body p    { margin-bottom: 5px; }
+    .spec-body ul   { padding-left: 13px; margin-bottom: 5px; }
+    .spec-body ol   { padding-left: 13px; margin-bottom: 5px; }
+    .spec-body li   { margin-bottom: 2px; }
+    .spec-body strong { font-weight: 700; }
+    .spec-body em     { font-style: italic; color: #718096; }
+    .spec-body code {
+      background: #edf2f7; border-radius: 3px; padding: 1px 4px;
+      font-size: 0.78em; font-family: "Consolas", monospace;
+    }
+    .spec-body table { border-collapse: collapse; width: 100%; font-size: 0.74rem; margin: 5px 0; }
+    .spec-body th, .spec-body td { border: 1px solid #e2e8f0; padding: 3px 6px; text-align: left; }
+    .spec-body th { background: #f7fafc; font-weight: 700; }
+
+    /* ── RESIZE HANDLE ── */
+    #resize-handle {
+      height: 6px;
+      background: #cbd5e0;
+      cursor: ns-resize;
+      flex-shrink: 0;
+      position: relative;
+      transition: background 0.15s;
+    }
+    #resize-handle:hover, #resize-handle.dragging { background: #3182ce; }
+    #resize-handle::after {
+      content: "";
+      position: absolute;
+      left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      width: 32px; height: 2px;
+      background: rgba(255,255,255,0.7);
+      border-radius: 1px;
+    }
+
+    /* ── CONVERSATION SECTION (bottom) ── */
+    #conversation-section {
+      flex: 45 0 0;
+      min-height: 60px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #f0f4f8;
+    }
+
+    #conv-header {
+      padding: 5px 16px;
+      background: #e2e8f0;
+      border-bottom: 1px solid #cbd5e0;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      color: #4a5568;
+      flex-shrink: 0;
+    }
+
+    #conversation {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    #conversation::-webkit-scrollbar      { width: 4px; }
+    #conversation::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 4px; }
 
     .msg {
-      max-width: 84%;
-      padding: 12px 16px;
-      border-radius: 12px;
+      max-width: 85%;
+      padding: 9px 13px;
+      border-radius: 10px;
       line-height: 1.6;
-      font-size: 0.9rem;
+      font-size: 0.86rem;
     }
     .msg.agent {
       align-self: flex-start;
       background: #fff;
       border: 1px solid #dde6ef;
-      border-bottom-left-radius: 4px;
+      border-bottom-left-radius: 3px;
     }
     .msg.user {
       align-self: flex-end;
       background: #1a365d;
       color: #fff;
-      border-bottom-right-radius: 4px;
+      border-bottom-right-radius: 3px;
     }
     .msg.system {
       align-self: center;
       background: #edf2f7;
       border: 1px dashed #a0aec0;
       color: #4a5568;
-      font-size: 0.82rem;
-      max-width: 65%;
-      text-align: center;
-    }
-    .msg.specialist {
-      align-self: center;
-      background: #ebf8ff;
-      border: 1px solid #90cdf4;
-      color: #2b6cb0;
-      font-size: 0.82rem;
+      font-size: 0.79rem;
       max-width: 65%;
       text-align: center;
     }
@@ -218,41 +374,36 @@
       background: #fff5f5;
       border: 1px solid #fc8181;
       color: #c53030;
-      font-size: 0.85rem;
+      font-size: 0.82rem;
     }
-
-    .msg.agent h1,.msg.agent h2,.msg.agent h3 { font-size: 0.95rem; font-weight: 700; margin: 10px 0 4px; }
-    .msg.agent p    { margin-bottom: 8px; }
-    .msg.agent ul   { padding-left: 18px; margin-bottom: 8px; }
-    .msg.agent ol   { padding-left: 18px; margin-bottom: 8px; }
-    .msg.agent li   { margin-bottom: 3px; }
-    .msg.agent code {
-      background: #f7fafc;
-      border-radius: 4px;
-      padding: 1px 5px;
-      font-size: 0.85em;
-      font-family: "Consolas", monospace;
-    }
-    .msg.agent pre code { display: block; padding: 10px; overflow-x: auto; white-space: pre; }
-    .msg.agent table { border-collapse: collapse; width: 100%; font-size: 0.85rem; margin: 8px 0; }
-    .msg.agent th, .msg.agent td { border: 1px solid #e2e8f0; padding: 5px 10px; text-align: left; }
-    .msg.agent th { background: #f7fafc; font-weight: 600; }
+    .msg.agent h1,.msg.agent h2,.msg.agent h3 { font-size: 0.88rem; font-weight: 700; margin: 7px 0 3px; }
+    .msg.agent p    { margin-bottom: 6px; }
+    .msg.agent ul   { padding-left: 15px; margin-bottom: 6px; }
+    .msg.agent ol   { padding-left: 15px; margin-bottom: 6px; }
+    .msg.agent li   { margin-bottom: 2px; }
     .msg.agent strong { font-weight: 700; }
     .msg.agent em     { font-style: italic; }
+    .msg.agent code {
+      background: #f7fafc; border-radius: 3px; padding: 1px 4px;
+      font-size: 0.82em; font-family: "Consolas", monospace;
+    }
+    .msg.agent table { border-collapse: collapse; width: 100%; font-size: 0.82rem; margin: 6px 0; }
+    .msg.agent th, .msg.agent td { border: 1px solid #e2e8f0; padding: 4px 8px; text-align: left; }
+    .msg.agent th { background: #f7fafc; font-weight: 700; }
     .msg.agent .flagged { color: #fc8181; font-weight: 700; font-family: "Consolas", monospace; }
 
     .thinking {
       align-self: flex-start;
       display: flex;
-      gap: 5px;
-      padding: 10px 14px;
+      gap: 4px;
+      padding: 8px 12px;
       background: #fff;
       border: 1px solid #dde6ef;
-      border-radius: 12px;
-      border-bottom-left-radius: 4px;
+      border-radius: 10px;
+      border-bottom-left-radius: 3px;
     }
     .thinking span {
-      width: 7px; height: 7px;
+      width: 6px; height: 6px;
       background: #a0aec0;
       border-radius: 50%;
       animation: bounce 1.2s infinite;
@@ -261,25 +412,28 @@
     .thinking span:nth-child(3) { animation-delay: 0.4s; }
     @keyframes bounce {
       0%,80%,100% { transform: translateY(0); }
-      40%          { transform: translateY(-6px); }
+      40%          { transform: translateY(-5px); }
     }
 
+    /* ── INPUT AREA ── */
     #input-area {
-      padding: 14px 20px;
+      height: var(--input-h);
       background: #fff;
       border-top: 1px solid #e2e8f0;
       display: flex;
+      align-items: center;
+      padding: 0 14px;
       gap: 10px;
       flex-shrink: 0;
+      display: none;
     }
     #user-input {
       flex: 1;
       border: 1.5px solid #c8d6e5;
-      border-radius: 8px;
-      padding: 10px 14px;
-      font-size: 0.95rem;
+      border-radius: 7px;
+      padding: 8px 12px;
+      font-size: 0.9rem;
       outline: none;
-      margin-bottom: 0;
     }
     #user-input:focus    { border-color: #1a365d; }
     #user-input:disabled { background: #f7fafc; color: #aaa; }
@@ -287,12 +441,12 @@
       background: #1a365d;
       color: #fff;
       border: none;
-      border-radius: 8px;
-      padding: 10px 20px;
-      font-size: 0.9rem;
-      font-weight: 600;
+      border-radius: 7px;
+      padding: 8px 18px;
+      font-size: 0.88rem;
+      font-weight: 700;
       cursor: pointer;
-      transition: background 0.2s;
+      transition: background 0.15s;
       flex-shrink: 0;
     }
     #send-btn:hover:not(:disabled) { background: #2c5282; }
@@ -301,30 +455,35 @@
 </head>
 <body>
 
+<!-- HEADER -->
 <header>
-  <div>
-    <h1>Conductor</h1>
-    <div class="sub">Local Multi-Agent AI Orchestrator</div>
+  <div class="app-icon">&#127775;</div>
+  <div class="app-title">
+    <h1>Orchestrator</h1>
+    <div class="sub">AgentLibrary Specialist Routing and Execution</div>
   </div>
   <div id="session-badge"></div>
+  <div id="cost-badge" style="display:none;"></div>
+  <button id="stop-btn"  style="display:none;">&#9632; Stop</button>
+  <button id="reset-btn" style="display:none;">&#8635; New Session</button>
 </header>
 
+<!-- SETUP PANEL -->
 <div id="setup-panel">
   <div class="setup-card">
     <h2>Route a Task to a Specialist</h2>
-    <p>Describe your task and Conductor will analyze the AgentLibrary,
-       select the right specialist agent(s), confirm the routing plan with you,
-       execute each specialist, and synthesize a final answer.
-       If no specialist exists, Conductor creates one on the spot.</p>
+    <p>Describe your task and the Orchestrator will read the AgentLibrary,
+       select the right specialist(s), confirm the routing plan, execute them
+       (in parallel when independent), and synthesize the result.</p>
 
     <label for="preset-select">Model / Cost</label>
     <select id="preset-select">
-      <option value="full">Full &mdash; Opus 4 Conductor + Sonnet 4.6 Specialists &mdash; ~$0.20-0.80 (recommended)</option>
+      <option value="full">Full &mdash; Opus 4 Orchestrator + Sonnet 4.6 Specialists &mdash; ~$0.20-0.80 (recommended)</option>
       <option value="economy">Economy &mdash; Sonnet 4.6 for all &mdash; ~$0.05-0.20 per task</option>
     </select>
     <div class="hint">
-      Full uses Opus 4 for routing and Sonnet 4.6 for specialists &mdash; recommended for real tasks.
-      Economy uses Sonnet 4.6 everywhere and is good for testing.
+      Full uses Opus 4 for routing decisions and Sonnet 4.6 for specialists.
+      Economy uses Sonnet 4.6 everywhere, good for testing.
     </div>
 
     <button id="start-btn">Start Session</button>
@@ -332,71 +491,113 @@
   </div>
 </div>
 
-<div id="chat-panel">
-  <div id="status-strip">
-    <span class="label">Status:</span>
-    <span id="status-indicator"></span>
-    <span id="agent-count"></span>
-  </div>
-  <div id="body-split">
-    <div id="messages"></div>
-    <div id="activity-panel">
-      <div id="activity-header">Agent Activity</div>
-      <div id="activity-log"></div>
+<!-- STATUS STRIP -->
+<div id="status-strip">
+  <span class="lbl">Status:</span>
+  <span id="status-indicator"></span>
+  <span id="spec-count"></span>
+</div>
+
+<!-- WORK AREA -->
+<div id="work-area">
+
+  <!-- TOP: Specialist panels -->
+  <div id="specialist-section">
+    <div id="spec-section-header">
+      <span class="title">&#129302; Specialist Workspace</span>
+      <span class="hint" id="spec-hint">Specialists appear here as the Orchestrator calls them</span>
+    </div>
+    <div id="specialist-grid">
+      <div id="specialist-empty">No specialists called yet</div>
     </div>
   </div>
-  <div id="input-area">
-    <input type="text" id="user-input" placeholder="Waiting for Conductor..." disabled autocomplete="off">
-    <button id="send-btn" disabled>Send</button>
+
+  <!-- RESIZE HANDLE -->
+  <div id="resize-handle"></div>
+
+  <!-- BOTTOM: Orchestrator conversation -->
+  <div id="conversation-section">
+    <div id="conv-header">&#129302; Orchestrator</div>
+    <div id="conversation"></div>
   </div>
+
+</div>
+
+<!-- INPUT AREA -->
+<div id="input-area">
+  <input type="text" id="user-input" placeholder="Waiting for Orchestrator..." disabled autocomplete="off">
+  <button id="send-btn" disabled>Send</button>
 </div>
 
 <script>
-  const setupPanel      = document.getElementById('setup-panel');
-  const chatPanel       = document.getElementById('chat-panel');
-  const messages        = document.getElementById('messages');
-  const statusIndicator = document.getElementById('status-indicator');
-  const agentCount      = document.getElementById('agent-count');
-  const userInput       = document.getElementById('user-input');
-  const sendBtn         = document.getElementById('send-btn');
-  const sessionBadge    = document.getElementById('session-badge');
-  const activityLog     = document.getElementById('activity-log');
+  const setupPanel      = document.getElementById("setup-panel");
+  const statusStrip     = document.getElementById("status-strip");
+  const workArea        = document.getElementById("work-area");
+  const inputArea       = document.getElementById("input-area");
+  const conversation    = document.getElementById("conversation");
+  const statusIndicator = document.getElementById("status-indicator");
+  const specCountEl     = document.getElementById("spec-count");
+  const specGrid        = document.getElementById("specialist-grid");
+  const specEmpty       = document.getElementById("specialist-empty");
+  const specHint        = document.getElementById("spec-hint");
+  const userInput       = document.getElementById("user-input");
+  const sendBtn         = document.getElementById("send-btn");
+  const sessionBadge    = document.getElementById("session-badge");
 
-  let waitingForInput = false;
-  let thinkingEl      = null;
+  let waitingForInput   = false;
+  let thinkingEl        = null;
+  let specCount         = 0;
+  let es                = null;
+  let reconnectAttempts = 0;
+  const MAX_RECONNECT   = 8;
 
-  function addActivity(cssClass, icon, label) {
-    const now  = new Date();
-    const time = now.toTimeString().slice(0, 8);
-    const row  = document.createElement('div');
-    row.className = `activity-row ${cssClass}`;
-    row.innerHTML = `
-      <div class="activity-icon">${icon}</div>
-      <div class="activity-body">
-        <div class="activity-label">${label}</div>
-        <div class="activity-time">${time}</div>
-      </div>`;
-    activityLog.appendChild(row);
-    activityLog.scrollTop = activityLog.scrollHeight;
+  const specText  = {};  // slug -> accumulated streaming text
+  const specDirty = {};  // slug -> bool
+
+  const PANEL_COLORS = [
+    "#2b4c8c", "#1d5c3b", "#5b3a8a", "#b35a00",
+    "#1a6b6b", "#7b2d8b", "#9b3030", "#2d5a27",
+  ];
+
+  // ── Streaming render loop (300ms) ────────────────────────────────────
+  setInterval(() => {
+    for (const slug of Object.keys(specText)) {
+      if (specDirty[slug]) {
+        const el = document.getElementById("spec-body-" + slug);
+        if (el) {
+          el.innerHTML = marked.parse(specText[slug] || "");
+          el.scrollTop = el.scrollHeight;
+          specDirty[slug] = false;
+        }
+      }
+    }
+  }, 300);
+
+  // ── Status ───────────────────────────────────────────────────────────
+  function setStatus(cssClass, label) {
+    statusIndicator.textContent   = label;
+    statusIndicator.className     = cssClass;
+    statusIndicator.style.display = cssClass ? "inline-block" : "none";
   }
 
-  function addMessage(type, html) {
+  // ── Conversation helpers ──────────────────────────────────────────────
+  function addMsg(type, html) {
     removeThinking();
-    const div = document.createElement('div');
-    div.className = `msg ${type}`;
+    const div = document.createElement("div");
+    div.className = "msg " + type;
     div.innerHTML = html;
-    messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
+    conversation.appendChild(div);
+    conversation.scrollTop = conversation.scrollHeight;
     return div;
   }
 
   function addThinking() {
     removeThinking();
-    thinkingEl = document.createElement('div');
-    thinkingEl.className = 'thinking';
-    thinkingEl.innerHTML = '<span></span><span></span><span></span>';
-    messages.appendChild(thinkingEl);
-    messages.scrollTop = messages.scrollHeight;
+    thinkingEl = document.createElement("div");
+    thinkingEl.className = "thinking";
+    thinkingEl.innerHTML = "<span></span><span></span><span></span>";
+    conversation.appendChild(thinkingEl);
+    conversation.scrollTop = conversation.scrollHeight;
   }
 
   function removeThinking() {
@@ -407,160 +608,413 @@
     waitingForInput    = enabled;
     userInput.disabled = !enabled;
     sendBtn.disabled   = !enabled;
-    userInput.placeholder = enabled ? 'Type your reply...' : 'Waiting for Conductor...';
+    userInput.placeholder = enabled ? "Type your reply..." : "Waiting for Orchestrator...";
     if (enabled) userInput.focus();
   }
 
-  function setStatus(cssClass, label) {
-    statusIndicator.textContent   = label;
-    statusIndicator.className     = cssClass;
-    statusIndicator.style.display = cssClass ? 'inline-block' : 'none';
+  // ── Specialist panels ────────────────────────────────────────────────
+  function createSpecPanel(slug, contextFrom) {
+    specEmpty.style.display = "none";
+    specHint.style.display  = "none";
+
+    // If panel already exists (continuation call), reset it in place — no duplicate
+    if (document.getElementById("spec-panel-" + slug)) {
+      specText[slug]  = "";
+      specDirty[slug] = false;
+      const statusEl   = document.getElementById("spec-status-"   + slug);
+      const subtitleEl = document.getElementById("spec-subtitle-" + slug);
+      const bodyEl     = document.getElementById("spec-body-"     + slug);
+      if (statusEl)   { statusEl.className = "spec-status calling"; statusEl.textContent = "Calling..."; }
+      if (subtitleEl) subtitleEl.textContent = "Continuation — script too long, resuming...";
+      if (bodyEl)     bodyEl.innerHTML = "";
+      return;
+    }
+
+    const color = PANEL_COLORS[specCount % PANEL_COLORS.length];
+    specCount++;
+
+    specText[slug]  = "";
+    specDirty[slug] = false;
+
+    const subtitle = (contextFrom && contextFrom.length > 0)
+      ? "Receiving info from: " + contextFrom.join(", ")
+      : "Running independently";
+
+    const panel = document.createElement("div");
+    panel.className = "spec-panel";
+    panel.id = "spec-panel-" + slug;
+
+    panel.innerHTML =
+      '<div class="spec-header" style="background:' + color + ';">' +
+        '<div class="spec-header-left">' +
+          '<span class="spec-name">' + slug + "</span>" +
+          '<span class="spec-subtitle" id="spec-subtitle-' + slug + '">' + subtitle + "</span>" +
+        "</div>" +
+        '<span class="spec-status calling" id="spec-status-' + slug + '">Calling...</span>' +
+      "</div>" +
+      '<div class="spec-body" id="spec-body-' + slug + '"></div>';
+
+    specGrid.appendChild(panel);
+
+    // Tell source agents their output is being forwarded to this agent
+    if (contextFrom && contextFrom.length > 0) {
+      for (const src of contextFrom) {
+        updateSpecSubtitle(src, "Info forwarded to: " + slug);
+      }
+    }
+
+    specCountEl.textContent   = specCount + " specialist" + (specCount > 1 ? "s" : "");
+    specCountEl.style.display = "inline";
   }
 
-  document.getElementById('start-btn').addEventListener('click', async () => {
-    const preset = document.getElementById('preset-select').value;
-    const errEl  = document.getElementById('setup-error');
-    errEl.style.display = 'none';
-    document.getElementById('start-btn').disabled    = true;
-    document.getElementById('start-btn').textContent = 'Starting...';
+  function updateSpecSubtitle(slug, text) {
+    const el = document.getElementById("spec-subtitle-" + slug);
+    if (el) el.textContent = text;
+  }
 
-    const resp = await fetch('/start', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({preset})
+  function markSpecDone(slug, display) {
+    const statusEl   = document.getElementById("spec-status-"   + slug);
+    const nameEl     = statusEl ? statusEl.parentElement.querySelector(".spec-name") : null;
+    const subtitleEl = document.getElementById("spec-subtitle-" + slug);
+
+    if (statusEl) { statusEl.className = "spec-status done"; statusEl.textContent = "Done"; }
+    if (nameEl && display && display !== slug) nameEl.textContent = display;
+
+    // Advance subtitle — but don't overwrite if it already says "Info forwarded to: X"
+    if (subtitleEl) {
+      const cur = subtitleEl.textContent;
+      if (cur === "Running independently") {
+        subtitleEl.textContent = "Analysis complete";
+      } else if (cur.startsWith("Receiving info from:")) {
+        subtitleEl.textContent = "Info received & applied";
+      }
+      // "Info forwarded to: X" — leave as-is, most descriptive state
+    }
+
+    const bodyEl = document.getElementById("spec-body-" + slug);
+    if (bodyEl && specText[slug]) {
+      bodyEl.innerHTML = marked.parse(specText[slug]);
+      bodyEl.scrollTop = 0;
+    }
+  }
+
+  function markSpecError(slug, error) {
+    const statusEl = document.getElementById("spec-status-" + slug);
+    const bodyEl   = document.getElementById("spec-body-"   + slug);
+    if (statusEl) { statusEl.className = "spec-status error"; statusEl.textContent = "Error"; }
+    if (bodyEl)   bodyEl.innerHTML = '<span style="color:#c53030;font-size:0.75rem;">Error: ' + error + "</span>";
+  }
+
+  // ── Start session ─────────────────────────────────────────────────────
+  document.getElementById("start-btn").addEventListener("click", async () => {
+    const preset = document.getElementById("preset-select").value;
+    const errEl  = document.getElementById("setup-error");
+    errEl.style.display = "none";
+    document.getElementById("start-btn").disabled    = true;
+    document.getElementById("start-btn").textContent = "Starting...";
+
+    const resp = await fetch("/start", {
+      method:  "POST",
+      headers: {"Content-Type": "application/json"},
+      body:    JSON.stringify({ preset }),
     });
     const data = await resp.json();
 
     if (data.error) {
       errEl.textContent   = data.error;
-      errEl.style.display = 'block';
-      document.getElementById('start-btn').disabled    = false;
-      document.getElementById('start-btn').textContent = 'Start Session';
+      errEl.style.display = "block";
+      document.getElementById("start-btn").disabled    = false;
+      document.getElementById("start-btn").textContent = "Start Session";
       return;
     }
 
-    setupPanel.style.display = 'none';
-    chatPanel.style.display  = 'flex';
-    sessionBadge.textContent  = `${data.preset} (${data.cost})`;
-    sessionBadge.style.display = 'block';
+    setupPanel.style.display  = "none";
+    statusStrip.style.display = "flex";
+    workArea.style.display    = "flex";
+    inputArea.style.display   = "flex";
 
-    addMessage('system', `Conductor started &mdash; <strong>${data.preset}</strong> (${data.cost})`);
-    addActivity('phase', '\u{1F680}', `Session started — ${data.preset}`);
+    sessionBadge.textContent   = data.preset + " (" + data.cost + ")";
+    sessionBadge.style.display = "block";
+    stopBtn.style.display      = "inline-block";
+    resetBtn.style.display     = "inline-block";
+
+    addMsg("system", "Orchestrator started &mdash; <strong>" + data.preset + "</strong> (" + data.cost + ")");
     addThinking();
     connectSSE();
   });
 
+  // ── SSE ───────────────────────────────────────────────────────────────
   function connectSSE() {
-    const es = new EventSource('/events');
+    es = new EventSource("/events");
+
+    es.onopen = () => { reconnectAttempts = 0; };
 
     es.onmessage = (e) => {
       const msg = JSON.parse(e.data);
-      if (msg.type === 'ping') return;
+      if (msg.type === "ping") return;
 
-      if (msg.type === 'agent_message') {
+      if (msg.type === "user_message") {
+        addMsg("user", msg.text);
+      }
+      else if (msg.type === "agent_message") {
         removeThinking();
-        addMessage('agent', marked.parse(msg.text));
-        addActivity('phase', '\u{1F9E0}', 'Conductor responded');
+        addMsg("agent", marked.parse(msg.text));
       }
-      else if (msg.type === 'tool_start') {
-        setStatus('running', msg.label || 'Working...');
+      else if (msg.type === "tool_start") {
+        setStatus("running", msg.label || "Working...");
         addThinking();
-        if (msg.tool === 'list_agents') {
-          addActivity('library', '\u{1F4DA}', 'Reading AgentLibrary...');
-        } else if (msg.tool === 'write_file') {
-          addActivity('save', '\u{1F4BE}', msg.label || 'Saving file...');
-        } else {
-          addActivity('library', '⚙️', msg.label || msg.tool);
-        }
       }
-      else if (msg.type === 'tool_done') {
-        setStatus('done', msg.label || 'Done');
-        if (msg.tool === 'list_agents') {
-          agentCount.style.display = 'inline';
-          addActivity('done', '✅', msg.label || 'Library loaded');
-        } else if (msg.tool === 'write_file') {
-          addActivity('saved', '\u{1F4C4}', msg.label || 'File saved');
-        } else {
-          addActivity('done', '✅', msg.label || 'Done');
-        }
+      else if (msg.type === "tool_done") {
+        setStatus("done", msg.label || "Done");
       }
-      else if (msg.type === 'specialist_start') {
-        const name = msg.agent || 'specialist';
-        setStatus('calling', `Calling ${name}...`);
-        addMessage('specialist', `Routing to <strong>${name}</strong>...`);
+      else if (msg.type === "specialist_start") {
+        setStatus("calling", "Calling " + (msg.agent || "specialist") + "...");
+        createSpecPanel(msg.agent || "specialist", msg.context_from || []);
         addThinking();
-        addActivity('calling', '\u{1F916}', `Calling ${name}...`);
       }
-      else if (msg.type === 'specialist_done') {
-        const name = msg.agent || 'specialist';
-        setStatus('done', `${name} responded`);
-        addActivity('done', '✅', `${name} responded`);
+      else if (msg.type === "specialist_token") {
+        const slug = msg.agent;
+        specText[slug]  = (specText[slug] || "") + msg.token;
+        specDirty[slug] = true;
       }
-      else if (msg.type === 'create_agent_start') {
-        const name = msg.agent || 'new-agent';
-        setStatus('running', msg.label || `Creating ${name}...`);
+      else if (msg.type === "specialist_done") {
+        setStatus("done", (msg.display || msg.agent || "specialist") + " responded");
+        markSpecDone(msg.agent, msg.display);
+      }
+      else if (msg.type === "specialist_error") {
+        markSpecError(msg.agent, msg.error);
+      }
+      else if (msg.type === "safecomms_start") {
+        setStatus("running", msg.label || "SafeComms scanning...");
         addThinking();
-        addActivity('creating', '\u{1F528}', msg.label || `Creating ${name}...`);
       }
-      else if (msg.type === 'create_agent_done') {
-        setStatus('done', msg.label || 'Agent created');
-        addActivity('created', '⭐', msg.label || 'Agent saved to library');
+      else if (msg.type === "safecomms_clean") {
+        setStatus("done", "SafeComms: CLEAN");
+        removeThinking();
       }
-      else if (msg.type === 'project_start') {
-        setStatus('running', msg.label || 'Creating project...');
+      else if (msg.type === "safecomms_blocked") {
+        setStatus("running", "SafeComms: BLOCKED");
+        removeThinking();
+      }
+      else if (msg.type === "create_agent_start") {
+        setStatus("running", msg.label || "Creating agent...");
         addThinking();
-        addActivity('project', '\u{1F4C1}', msg.label || 'Creating project...');
       }
-      else if (msg.type === 'project_done') {
-        setStatus('done', msg.label || 'Project created');
-        addActivity('projected', '✅', (msg.label || 'Project created') + (msg.path ? ` — ${msg.path}` : ''));
+      else if (msg.type === "create_agent_done") {
+        setStatus("done", msg.label || "Agent created");
       }
-      else if (msg.type === 'waiting_input') {
+      else if (msg.type === "project_start") {
+        setStatus("running", msg.label || "Creating project...");
+        addThinking();
+      }
+      else if (msg.type === "project_done") {
+        setStatus("done", msg.label || "Project created");
+      }
+      else if (msg.type === "waiting_input") {
         removeThinking();
         setInputEnabled(true);
-        addActivity('phase', '⏳', 'Waiting for your reply');
       }
-      else if (msg.type === 'session_done') {
+      else if (msg.type === "usage") {
+        const u = msg.usage || {};
+
+        // Orchestrator tokens -- apply rates based on actual model
+        const orchInp = u.orch_input_tokens  || 0;
+        const orchOut = u.orch_output_tokens || 0;
+        const orchModel = u.orchestrator_model || "";
+        const isOpus = orchModel.includes("opus");
+        const orchInRate  = isOpus ? 15  : 3;
+        const orchOutRate = isOpus ? 75  : 15;
+
+        // Specialist tokens -- always Sonnet 4.6
+        const specInp = u.spec_input_tokens  || 0;
+        const specOut = u.spec_output_tokens || 0;
+
+        const orchCost = (orchInp * orchInRate + orchOut * orchOutRate) / 1_000_000;
+        const specCost = (specInp * 3          + specOut * 15)          / 1_000_000;
+        const cost     = orchCost + specCost;
+
+        const total = (u.input_tokens || 0) + (u.output_tokens || 0);
+        const fmt   = (n) => n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n);
+
+        costBadge.textContent   = "~$" + cost.toFixed(3) + "  |  " + fmt(total) + " tok";
+        costBadge.style.display = "inline-block";
+        costBadge.title =
+          "Orchestrator (" + (orchModel || "?") + "): " + fmt(orchInp) + " in / " + fmt(orchOut) + " out" +
+          "\nSpecialists (Sonnet 4.6): " + fmt(specInp) + " in / " + fmt(specOut) + " out" +
+          "\nOrch rates: $" + orchInRate + "/$" + orchOutRate + " per MTok  |  Spec rates: $3/$15 per MTok";
+      }
+      else if (msg.type === "stopped") {
         removeThinking();
-        setStatus('', '');
-        addMessage('system', 'Session complete. Reload to start a new task.');
-        addActivity('done', '\u{1F3C1}', 'Session complete');
+        setStatus("done", "Stopped");
+        addMsg("system", "&#9632; Session stopped. All completed panels remain visible.");
+        stopBtn.disabled = true;
+        setInputEnabled(false);
+      }
+      else if (msg.type === "session_done") {
+        removeThinking();
+        setStatus("", "");
+        addMsg("system", "Session complete. Reload to start a new task.");
+        stopBtn.style.display = "none";
         setInputEnabled(false);
         es.close();
       }
-      else if (msg.type === 'error') {
+      else if (msg.type === "error") {
         removeThinking();
-        addMessage('error', `Error: ${msg.message}`);
-        addActivity('error', '❌', msg.message);
+        addMsg("error", "Error: " + msg.message);
         setInputEnabled(false);
         es.close();
       }
     };
 
     es.onerror = () => {
-      removeThinking();
-      addMessage('error', 'Connection lost. Refresh to reconnect.');
       es.close();
+      es = null;
+
+      if (reconnectAttempts >= MAX_RECONNECT) {
+        removeThinking();
+        addMsg("error", "Connection lost after " + MAX_RECONNECT + " reconnect attempts. Refresh to start over.");
+        return;
+      }
+
+      // Check if the session is still running before giving up.
+      const delay = Math.min(1000 * Math.pow(1.5, reconnectAttempts), 15000);
+      reconnectAttempts++;
+
+      fetch("/state")
+        .then(r => r.json())
+        .then(state => {
+          if (state.done || !state.active) {
+            // Session ended — not a connection drop, just a clean finish arriving late.
+            removeThinking();
+            addMsg("system", "Session complete. Reload to start a new task.");
+            return;
+          }
+          // Session still running — reconnect silently.
+          addMsg("system", "Reconnecting... (attempt " + reconnectAttempts + ")");
+          setTimeout(connectSSE, delay);
+        })
+        .catch(() => {
+          // Server unreachable — give up.
+          removeThinking();
+          addMsg("error", "Server unreachable. Refresh to reconnect.");
+        });
     };
   }
 
+  // ── Send reply ────────────────────────────────────────────────────────
   async function sendReply() {
     if (!waitingForInput) return;
     const text = userInput.value.trim();
-    userInput.value = '';
+    userInput.value = "";
     setInputEnabled(false);
-    addMessage('user', text || '(no input)');
+    addMsg("user", text || "(no input)");
     addThinking();
-    await fetch('/reply', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({message: text})
+    await fetch("/reply", {
+      method:  "POST",
+      headers: {"Content-Type": "application/json"},
+      body:    JSON.stringify({ message: text }),
     });
   }
 
-  sendBtn.addEventListener('click', sendReply);
-  userInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendReply(); });
-</script>
+  sendBtn.addEventListener("click", sendReply);
+  userInput.addEventListener("keydown", (e) => { if (e.key === "Enter") sendReply(); });
 
+  // ── Reset / New Session ──────────────────────────────────────────────
+  const costBadge = document.getElementById("cost-badge");
+  const stopBtn   = document.getElementById("stop-btn");
+  const resetBtn  = document.getElementById("reset-btn");
+
+  function resetSession() {
+    if (es) { es.close(); es = null; }
+    reconnectAttempts = 0;
+
+    // Clear specialist grid — remove panels but keep the empty div so the const ref stays valid
+    Array.from(specGrid.querySelectorAll(".spec-panel")).forEach(p => p.remove());
+    specEmpty.style.display = "";
+    specHint.style.display  = "";
+    specCount = 0;
+    for (const k of Object.keys(specText))  delete specText[k];
+    for (const k of Object.keys(specDirty)) delete specDirty[k];
+    specCountEl.style.display = "none";
+    specCountEl.textContent   = "";
+
+    // Clear conversation
+    conversation.innerHTML = "";
+
+    // Clear any inline resize — let CSS flex ratios take over
+    specSection.style.flex = "";
+    convSection.style.flex = "";
+
+    // Hide work area, status strip, input
+    workArea.style.display    = "none";
+    statusStrip.style.display = "none";
+    inputArea.style.display   = "none";
+
+    // Hide session badge, cost badge, stop and reset buttons
+    sessionBadge.style.display = "none";
+    costBadge.style.display    = "none";
+    stopBtn.style.display      = "none";
+    stopBtn.disabled           = false;
+    stopBtn.textContent        = "■ Stop";
+    resetBtn.style.display     = "none";
+
+    // Reset status indicator
+    setStatus("", "");
+
+    // Re-enable start button and show setup panel
+    document.getElementById("start-btn").disabled    = false;
+    document.getElementById("start-btn").textContent = "Start Session";
+    document.getElementById("setup-error").style.display = "none";
+    setupPanel.style.display = "flex";
+
+    waitingForInput = false;
+    thinkingEl      = null;
+  }
+
+  resetBtn.addEventListener("click", resetSession);
+
+  stopBtn.addEventListener("click", async () => {
+    stopBtn.disabled    = true;
+    stopBtn.textContent = "Stopping...";
+    setStatus("running", "Stopping...");
+    await fetch("/stop", { method: "POST" });
+  });
+
+  // ── Resize handle ─────────────────────────────────────────────────────
+  const resizeHandle  = document.getElementById("resize-handle");
+  const specSection   = document.getElementById("specialist-section");
+  const convSection   = document.getElementById("conversation-section");
+
+  let isResizing = false, startY = 0, startSpecH = 0, startConvH = 0;
+
+  resizeHandle.addEventListener("mousedown", (e) => {
+    isResizing  = true;
+    startY      = e.clientY;
+    startSpecH  = specSection.offsetHeight;
+    startConvH  = convSection.offsetHeight;
+    resizeHandle.classList.add("dragging");
+    document.body.style.cursor     = "ns-resize";
+    document.body.style.userSelect = "none";
+    e.preventDefault();
+  });
+
+  document.addEventListener("mousemove", (e) => {
+    if (!isResizing) return;
+    const delta    = e.clientY - startY;
+    const newSpecH = Math.max(60, startSpecH + delta);
+    const newConvH = Math.max(60, startConvH - delta);
+    // Use flex ratios instead of px so layout survives window resize
+    specSection.style.flex = newSpecH + " 0 0";
+    convSection.style.flex = newConvH + " 0 0";
+  });
+
+  document.addEventListener("mouseup", () => {
+    if (!isResizing) return;
+    isResizing = false;
+    resizeHandle.classList.remove("dragging");
+    document.body.style.cursor     = "";
+    document.body.style.userSelect = "";
+  });
+</script>
 </body>
 </html>

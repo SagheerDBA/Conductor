@@ -3,5 +3,10 @@ __pycache__/
 *.pyo
 .env
 output/
-*.credential.xml
+*.credentials.json
 *.secrets
+CLAUDE.md
+AGENT-HANDOFF.md
+HOW_TO_RUN.md
+*.code-workspace
+BLOG_NOTES.md
