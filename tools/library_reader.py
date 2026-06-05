@@ -301,7 +301,9 @@ def write_file(filename: str, content: str, subfolder: str = "") -> dict:
     try:
         with open(path, "w", encoding="utf-8") as f:
             f.write(content)
-        return {"saved": True, "path": path, "folder": folder, "bytes": len(content.encode("utf-8"))}
+        home = os.path.expanduser("~")
+        display = path.replace(home, "~") if path.startswith(home) else path
+        return {"saved": True, "path": display, "bytes": len(content.encode("utf-8"))}
     except Exception as e:
         return {"error": str(e)}
 

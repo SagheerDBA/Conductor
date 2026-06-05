@@ -166,7 +166,7 @@ def events():
 
 if __name__ == "__main__":
     print()
-    print("Orchestrator")
+    print("Conductor")
     print("AgentLibrary Specialist Routing and Execution")
     print("=" * 45)
     print()
@@ -178,7 +178,6 @@ if __name__ == "__main__":
         raise SystemExit(1)
 
     print("Starting at http://localhost:5002")
-    print("AgentFactory available at http://localhost:5001")
     print("Press Ctrl+C to stop.")
     print()
     app.run(host="127.0.0.1", port=5002, debug=False, threaded=True)

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Orchestrator</title>
+  <title>Conductor</title>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -459,7 +459,7 @@
 <header>
   <div class="app-icon">&#127775;</div>
   <div class="app-title">
-    <h1>Orchestrator</h1>
+    <h1>Conductor</h1>
     <div class="sub">AgentLibrary Specialist Routing and Execution</div>
   </div>
   <div id="session-badge"></div>
@@ -472,13 +472,13 @@
 <div id="setup-panel">
   <div class="setup-card">
     <h2>Route a Task to a Specialist</h2>
-    <p>Describe your task and the Orchestrator will read the AgentLibrary,
+    <p>Describe your task and the Conductor will read the AgentLibrary,
        select the right specialist(s), confirm the routing plan, execute them
        (in parallel when independent), and synthesize the result.</p>
 
     <label for="preset-select">Model / Cost</label>
     <select id="preset-select">
-      <option value="full">Full &mdash; Opus 4 Orchestrator + Sonnet 4.6 Specialists &mdash; ~$0.20-0.80 (recommended)</option>
+      <option value="full">Full &mdash; Opus 4 Conductor + Sonnet 4.6 Specialists &mdash; ~$0.20-0.80 (recommended)</option>
       <option value="economy">Economy &mdash; Sonnet 4.6 for all &mdash; ~$0.05-0.20 per task</option>
     </select>
     <div class="hint">
@@ -505,7 +505,7 @@
   <div id="specialist-section">
     <div id="spec-section-header">
       <span class="title">&#129302; Specialist Workspace</span>
-      <span class="hint" id="spec-hint">Specialists appear here as the Orchestrator calls them</span>
+      <span class="hint" id="spec-hint">Specialists appear here as the Conductor calls them</span>
     </div>
     <div id="specialist-grid">
       <div id="specialist-empty">No specialists called yet</div>
@@ -515,9 +515,9 @@
   <!-- RESIZE HANDLE -->
   <div id="resize-handle"></div>
 
-  <!-- BOTTOM: Orchestrator conversation -->
+  <!-- BOTTOM: Conductor conversation -->
   <div id="conversation-section">
-    <div id="conv-header">&#129302; Orchestrator</div>
+    <div id="conv-header">&#129302; Conductor</div>
     <div id="conversation"></div>
   </div>
 
@@ -525,7 +525,7 @@
 
 <!-- INPUT AREA -->
 <div id="input-area">
-  <input type="text" id="user-input" placeholder="Waiting for Orchestrator..." disabled autocomplete="off">
+  <input type="text" id="user-input" placeholder="Waiting for Conductor..." disabled autocomplete="off">
   <button id="send-btn" disabled>Send</button>
 </div>
 
@@ -608,7 +608,7 @@
     waitingForInput    = enabled;
     userInput.disabled = !enabled;
     sendBtn.disabled   = !enabled;
-    userInput.placeholder = enabled ? "Type your reply..." : "Waiting for Orchestrator...";
+    userInput.placeholder = enabled ? "Type your reply..." : "Waiting for Conductor...";
     if (enabled) userInput.focus();
   }
 
@@ -738,7 +738,7 @@
     stopBtn.style.display      = "inline-block";
     resetBtn.style.display     = "inline-block";
 
-    addMsg("system", "Orchestrator started &mdash; <strong>" + data.preset + "</strong> (" + data.cost + ")");
+    addMsg("system", "Conductor started &mdash; <strong>" + data.preset + "</strong> (" + data.cost + ")");
     addThinking();
     connectSSE();
   });
@@ -817,7 +817,7 @@
       else if (msg.type === "usage") {
         const u = msg.usage || {};
 
-        // Orchestrator tokens -- apply rates based on actual model
+        // Conductor tokens -- apply rates based on actual model
         const orchInp = u.orch_input_tokens  || 0;
         const orchOut = u.orch_output_tokens || 0;
         const orchModel = u.orchestrator_model || "";
@@ -839,7 +839,7 @@
         costBadge.textContent   = "~$" + cost.toFixed(3) + "  |  " + fmt(total) + " tok";
         costBadge.style.display = "inline-block";
         costBadge.title =
-          "Orchestrator (" + (orchModel || "?") + "): " + fmt(orchInp) + " in / " + fmt(orchOut) + " out" +
+          "Conductor (" + (orchModel || "?") + "): " + fmt(orchInp) + " in / " + fmt(orchOut) + " out" +
           "\nSpecialists (Sonnet 4.6): " + fmt(specInp) + " in / " + fmt(specOut) + " out" +
           "\nOrch rates: $" + orchInRate + "/$" + orchOutRate + " per MTok  |  Spec rates: $3/$15 per MTok";
       }

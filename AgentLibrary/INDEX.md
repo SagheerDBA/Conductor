@@ -11,6 +11,7 @@ Central registry of all specialist agents available to Conductor.
 |---|---|---|---|
 | [CodeReviewerAgent](Work/agents/code-reviewer-agent/definition.yaml) | Code quality review, bug detection, best practices | Production | v1.0 |
 | [DataAnalystAgent](Work/agents/data-analyst-agent/definition.yaml) | Data analysis, SQL queries, insight extraction | Production | v1.0 |
+| [SqlDbaAgent](Work/agents/sql-dba-agent/definition.yaml) | SQL Server DBA automation, PowerShell, dbatools | Production | v1.0 |
 
 ## Personal Agents
 
