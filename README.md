@@ -23,6 +23,18 @@ on each other, and synthesizes a final answer — all from a single browser sess
 
 ## Quick Start
 
+**0. Check Python**
+
+Conductor requires Python 3.10 or newer.
+
+```bash
+python --version
+```
+
+If you don't have it:
+- **Windows / macOS:** Download from [python.org/downloads](https://www.python.org/downloads). Check **"Add Python to PATH"** during setup.
+- **Linux (Ubuntu/Debian):** `sudo apt install python3 python3-pip`
+
 **1. Clone**
 ```bash
 git clone https://github.com/SagheerDBA/Conductor.git
