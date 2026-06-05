@@ -1,5 +1,5 @@
 # AgentLibrary -- Master Index
-Last Updated: 2026-06-04
+Last Updated: 2026-06-05
 
 Central registry of all specialist agents available to Conductor.
 
@@ -18,6 +18,7 @@ Central registry of all specialist agents available to Conductor.
 | Agent | Domain | Status | Version |
 |---|---|---|---|
 | [WriterAgent](Personal/agents/writer-agent/definition.yaml) | Writing, editing, content structuring | Production | v1.0 |
+| [SqlPerformanceAgent](Work/agents/sql-performance-agent/definition.yaml) | SQL Server performance analysis, wait statistics, AlwaysOn AG internals, redo thread tuning, and query/workload optimization. | Production | v1.0 |
 
 ---
 
