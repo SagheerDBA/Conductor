@@ -35,7 +35,7 @@ class OrchestratorSession:
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
 
-    def send_input(self, message: str):
+    def send_input(self, message):
         self._in.put(message)
 
     def get_output(self, timeout: float = 60):

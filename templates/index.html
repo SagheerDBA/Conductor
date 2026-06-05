@@ -417,16 +417,69 @@
 
     /* ── INPUT AREA ── */
     #input-area {
-      height: var(--input-h);
+      min-height: var(--input-h);
       background: #fff;
       border-top: 1px solid #e2e8f0;
       display: flex;
-      align-items: center;
-      padding: 0 14px;
-      gap: 10px;
+      flex-direction: column;
       flex-shrink: 0;
       display: none;
     }
+    #attachment-preview {
+      display: none;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 6px 14px 0;
+    }
+    .att-chip {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: #edf2f7;
+      border: 1px solid #c8d6e5;
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 0.76rem;
+      color: #2d3748;
+    }
+    .att-thumb {
+      width: 28px;
+      height: 28px;
+      object-fit: cover;
+      border-radius: 3px;
+    }
+    .att-icon { font-size: 0.9rem; }
+    .att-remove {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #718096;
+      font-size: 1rem;
+      padding: 0 2px;
+      line-height: 1;
+    }
+    .att-remove:hover { color: #c53030; }
+    #input-row {
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 8px;
+      min-height: var(--input-h);
+    }
+    #attach-btn {
+      background: none;
+      border: 1.5px solid #c8d6e5;
+      border-radius: 7px;
+      padding: 6px 9px;
+      font-size: 1rem;
+      cursor: pointer;
+      color: #4a5568;
+      transition: border-color 0.15s, color 0.15s;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+    #attach-btn:hover:not(:disabled) { border-color: #1a365d; color: #1a365d; }
+    #attach-btn:disabled { color: #c8d6e5; border-color: #e2e8f0; cursor: default; }
     #user-input {
       flex: 1;
       border: 1.5px solid #c8d6e5;
@@ -525,8 +578,13 @@
 
 <!-- INPUT AREA -->
 <div id="input-area">
-  <input type="text" id="user-input" placeholder="Waiting for Conductor..." disabled autocomplete="off">
-  <button id="send-btn" disabled>Send</button>
+  <div id="attachment-preview"></div>
+  <div id="input-row">
+    <button id="attach-btn" disabled title="Attach image or text file">&#128206;</button>
+    <input type="file" id="file-input" accept="image/*,.txt,.md,.py,.ps1,.sql,.log,.csv,.json" style="display:none">
+    <input type="text" id="user-input" placeholder="Waiting for Conductor..." disabled autocomplete="off">
+    <button id="send-btn" disabled>Send</button>
+  </div>
 </div>
 
 <script>
@@ -608,6 +666,7 @@
     waitingForInput    = enabled;
     userInput.disabled = !enabled;
     sendBtn.disabled   = !enabled;
+    attachBtn.disabled = !enabled;
     userInput.placeholder = enabled ? "Type your reply..." : "Waiting for Conductor...";
     if (enabled) userInput.focus();
   }
@@ -901,18 +960,108 @@
     };
   }
 
+  // ── Attachments ───────────────────────────────────────────────────────
+  let pendingAttachments = [];
+
+  const attachBtn  = document.getElementById("attach-btn");
+  const fileInput  = document.getElementById("file-input");
+  const attachPrev = document.getElementById("attachment-preview");
+
+  attachBtn.addEventListener("click", () => fileInput.click());
+
+  fileInput.addEventListener("change", (e) => {
+    for (const file of e.target.files) processAttachment(file);
+    e.target.value = "";
+  });
+
+  userInput.addEventListener("paste", (e) => {
+    const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+    for (const item of items) {
+      if (item.kind === "file" && item.type.startsWith("image/")) {
+        e.preventDefault();
+        processAttachment(item.getAsFile());
+      }
+    }
+  });
+
+  function processAttachment(file) {
+    const reader = new FileReader();
+    if (file.type.startsWith("image/")) {
+      reader.onload = (ev) => {
+        const dataUrl = ev.target.result;
+        pendingAttachments.push({
+          type:       "image",
+          media_type: file.type || "image/png",
+          data:       dataUrl.split(",")[1],
+          name:       file.name || "image",
+        });
+        renderAttachPrev();
+      };
+      reader.readAsDataURL(file);
+    } else {
+      reader.onload = (ev) => {
+        pendingAttachments.push({
+          type:     "text_file",
+          filename: file.name,
+          content:  ev.target.result,
+        });
+        renderAttachPrev();
+      };
+      reader.readAsText(file);
+    }
+  }
+
+  function renderAttachPrev() {
+    if (pendingAttachments.length === 0) {
+      attachPrev.style.display = "none";
+      attachPrev.innerHTML     = "";
+      return;
+    }
+    attachPrev.style.display = "flex";
+    attachPrev.innerHTML = pendingAttachments.map((a, i) =>
+      '<div class="att-chip">' +
+        (a.type === "image"
+          ? '<img class="att-thumb" src="data:' + a.media_type + ';base64,' + a.data + '">'
+          : '<span class="att-icon">&#128196;</span>') +
+        '<span>' + (a.name || a.filename) + '</span>' +
+        '<button class="att-remove" onclick="removeAttach(' + i + ')">&#215;</button>' +
+      '</div>'
+    ).join("");
+  }
+
+  function removeAttach(i) {
+    pendingAttachments.splice(i, 1);
+    renderAttachPrev();
+  }
+
   // ── Send reply ────────────────────────────────────────────────────────
   async function sendReply() {
     if (!waitingForInput) return;
-    const text = userInput.value.trim();
+    const text        = userInput.value.trim();
+    const attachments = pendingAttachments.splice(0);  // take all, clear array
+
     userInput.value = "";
+    renderAttachPrev();
     setInputEnabled(false);
-    addMsg("user", text || "(no input)");
+
+    // Build user bubble
+    let displayHtml = text || "";
+    for (const a of attachments) {
+      const sep = displayHtml ? "<br>" : "";
+      if (a.type === "image") {
+        displayHtml += sep + '<img src="data:' + a.media_type + ';base64,' + a.data +
+          '" style="max-width:200px;max-height:120px;border-radius:4px;margin-top:4px;display:block;">';
+      } else {
+        displayHtml += sep + '<span style="font-size:0.78rem;opacity:0.75;">&#128196; ' + a.filename + '</span>';
+      }
+    }
+    addMsg("user", displayHtml || "(no input)");
     addThinking();
+
     await fetch("/reply", {
       method:  "POST",
       headers: {"Content-Type": "application/json"},
-      body:    JSON.stringify({ message: text }),
+      body:    JSON.stringify({ message: text, attachments }),
     });
   }
 

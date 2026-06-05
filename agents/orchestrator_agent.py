@@ -40,6 +40,12 @@ Ask at most 2 focused clarifying questions if the task is ambiguous.
 Once the task is clear, say "Understood. Analyzing the AgentLibrary now..." and
 immediately move to Phase 2. Do not linger -- one exchange is usually enough.
 
+If the user's message includes an image or attached file, briefly acknowledge what you
+see in one sentence before proceeding -- e.g. "I can see an image showing a SQL query:
+`SELECT * FROM Orders WHERE CustomerID = 123`." or "I can see the attached file
+`diagnosis.txt`." Then treat the content as the task description and move straight to
+Phase 2 without asking the user to re-describe it.
+
 === PHASE 2: ANALYSIS ===
 Call list_agents to load all available specialists from the AgentLibrary.
 For each agent evaluate its domain, description, does/does_not boundaries, and
@@ -1000,7 +1006,9 @@ def run(output_fn=None, input_fn=None, status_fn=None, stop_fn=None):
                 messages.append({"role": "user", "content": "Please continue."})
             else:
                 try:
-                    user_input = input_fn().strip()
+                    user_input = input_fn()
+                    if isinstance(user_input, str):
+                        user_input = user_input.strip()
                 except (EOFError, KeyboardInterrupt):
                     break
 
@@ -1008,18 +1016,17 @@ def run(output_fn=None, input_fn=None, status_fn=None, stop_fn=None):
                     status_fn({"type": "stopped", "message": "Session stopped by user."})
                     break
 
-                if user_input.lower() in ("exit", "quit", "q"):
-                    break
-
-                if not user_input:
-                    user_input = "(no input)"
-
-                # Auto-inject work Gmail content if the message references email/alerts.
-                email_ctx = _prefetch_email_context(user_input, client, status_fn)
-                if email_ctx:
-                    status_fn({"type": "tool_done", "tool": "search_gmail",
-                               "label": "Email content injected into session"})
-                    user_input = user_input + "\n\n" + email_ctx
+                if isinstance(user_input, str):
+                    if user_input.lower() in ("exit", "quit", "q"):
+                        break
+                    if not user_input:
+                        user_input = "(no input)"
+                    # Auto-inject work Gmail content if the message references email/alerts.
+                    email_ctx = _prefetch_email_context(user_input, client, status_fn)
+                    if email_ctx:
+                        status_fn({"type": "tool_done", "tool": "search_gmail",
+                                   "label": "Email content injected into session"})
+                        user_input = user_input + "\n\n" + email_ctx
 
                 messages.append({"role": "assistant", "content": response.content})
                 messages.append({"role": "user",      "content": user_input})

@@ -104,10 +104,37 @@ def reply():
     global _session
     if not _session:
         return jsonify({"error": "No active session"}), 400
-    data    = request.get_json()
-    message = data.get("message", "").strip()
+    data        = request.get_json()
+    message     = data.get("message", "").strip()
+    attachments = data.get("attachments", [])
+
     message = _inject_gmail_context(message)
-    _session.send_input(message)
+
+    if attachments:
+        content = []
+        if message:
+            content.append({"type": "text", "text": message})
+        for att in attachments:
+            if att.get("type") == "image":
+                content.append({
+                    "type": "image",
+                    "source": {
+                        "type":       "base64",
+                        "media_type": att["media_type"],
+                        "data":       att["data"],
+                    }
+                })
+            elif att.get("type") == "text_file":
+                content.append({
+                    "type": "text",
+                    "text": f"[Attached file: {att['filename']}]\n{att['content']}"
+                })
+        if not content:
+            content = [{"type": "text", "text": "(no input)"}]
+        _session.send_input(content)
+    else:
+        _session.send_input(message or "(no input)")
+
     return jsonify({"status": "ok"})
 
 
