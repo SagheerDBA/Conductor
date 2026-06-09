@@ -24,7 +24,6 @@ import httpx
 
 import config
 from tools.library_reader import list_agents, call_specialist, write_file, create_agent, create_project, run_safecomms
-from tools.gmail_tool import search_gmail, read_email_thread
 
 TODAY = date.today().strftime("%Y-%m-%d")
 
@@ -269,28 +268,6 @@ Rules:
   all YAML definitions into a single response before calling any tools.
 - system_prompt must use the | block scalar (not >) to preserve formatting
 
-=== GMAIL TOOLS -- YOU HAVE EMAIL ACCESS ===
-You have two Gmail tools. This is not a limitation. Do NOT tell the user you cannot
-read email. You can and must use these tools when email context is needed.
-
-  search_gmail       -- search Gmail; returns subject/sender/date/thread_id per message
-  read_email_thread  -- read all messages in a thread (plain text body, up to 4000 chars each)
-
-Account:
-  "work"     -- your work Gmail account    (alerts, tickets, team emails)
-  "personal" -- your personal Gmail account (personal topics)
-  Default to "work" for any SQL/infrastructure topic.
-
-When the user says anything like "check my email", "look at the alert", "there's a ticket",
-"I got a message about [issue]" -- you MUST use search_gmail and read_email_thread.
-Do not ask the user to paste the email. Fetch it yourself.
-
-Workflow:
-  1. Call search_gmail("work", "<relevant query>") to find the thread
-  2. Call read_email_thread("work", thread_id) to get the full content
-  3. Call call_specialist("gmail-agent", "Work", <thread content as prepared_task>)
-  4. GmailAgent returns a structured briefing -- pass it to the SQL/AOAG/Cluster specialist
-
 === FALLBACK: NO MATCHING AGENT ===
 If no agent in the library covers the task, say so and offer two options:
 
@@ -354,7 +331,6 @@ Only trigger this offer when at least one new agent was created via create_agent
 Do NOT offer it for sessions that only used existing agents.
 
 === HARD RULES ===
-- You have Gmail access via search_gmail and read_email_thread -- NEVER tell the user you cannot read email
 - Always call list_agents first -- never assume which agents exist
 - Never call call_specialist before the user confirms the routing plan
 - prepared_task must be fully self-contained -- the specialist has NO other context
@@ -471,57 +447,6 @@ TOOLS = [
                 },
             },
             "required": ["category", "agent_slug", "yaml_content"],
-        },
-    },
-    {
-        "name": "search_gmail",
-        "description": (
-            "Search the work incident inbox for messages matching a query. "
-            "Returns subject, sender, date, thread_id, and message_id. "
-            "Use account='work' for SQL/infrastructure topics. "
-            "Call this first to locate the thread, then call read_email_thread."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "account": {
-                    "type": "string",
-                    "enum": ["personal", "work"],
-                    "description": "Use 'work' for SQL/infrastructure alerts and tickets.",
-                },
-                "query": {
-                    "type": "string",
-                    "description": "Search query, e.g. 'AOAG disconnected' or 'backup failure'.",
-                },
-                "max_results": {
-                    "type": "integer",
-                    "description": "Max results to return. Default 10.",
-                },
-            },
-            "required": ["account", "query"],
-        },
-    },
-    {
-        "name": "read_email_thread",
-        "description": (
-            "Read the full content of a work incident thread. "
-            "Returns all messages with sender, date, subject, and plain-text body. "
-            "Use thread_id from search_gmail. "
-            "Pass the full thread content in prepared_task when calling gmail-agent."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "account": {
-                    "type": "string",
-                    "enum": ["personal", "work"],
-                },
-                "thread_id": {
-                    "type": "string",
-                    "description": "Thread ID from search_gmail results.",
-                },
-            },
-            "required": ["account", "thread_id"],
         },
     },
     {
@@ -645,17 +570,6 @@ def _dispatch_tool(tool_name, tool_input, token_callback=None):
             tool_input.get("skill_name", ""),
             tool_input.get("skill_content", ""),
         )
-    elif tool_name == "search_gmail":
-        result = search_gmail(
-            tool_input["account"],
-            tool_input["query"],
-            tool_input.get("max_results", 10),
-        )
-    elif tool_name == "read_email_thread":
-        result = read_email_thread(
-            tool_input["account"],
-            tool_input["thread_id"],
-        )
     elif tool_name == "list_agents":
         result = list_agents()
     elif tool_name == "create_agent":
@@ -682,85 +596,6 @@ def _dispatch_tool(tool_name, tool_input, token_callback=None):
         result = {"error": f"Unknown tool: {tool_name}"}
 
     return json.dumps(result, indent=2)
-
-
-_EMAIL_TRIGGERS = (
-    "email", "alert", "ticket", "notification", "inbox", "mail",
-    "check my", "the alert", "got a", "received a",
-)
-
-
-def _prefetch_email_context(user_message: str, api_client, status_fn) -> str:
-    """
-    If user_message references a work email/alert/ticket, search Gmail and
-    return formatted thread content to inject into the conversation.
-    Returns empty string if no trigger detected or fetch fails.
-    """
-    lower = user_message.lower()
-    if not any(t in lower for t in _EMAIL_TRIGGERS):
-        return ""
-
-    status_fn({"type": "tool_start", "tool": "search_gmail",
-               "label": "Email trigger detected -- searching work Gmail..."})
-
-    # Use Haiku to extract a targeted Gmail search query.
-    try:
-        extract = api_client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=60,
-            messages=[{"role": "user", "content": (
-                "Extract a Gmail search query for this request. "
-                "Reply with ONLY the query string, nothing else.\n\n"
-                f"Request: {user_message}"
-            )}],
-        )
-        query = extract.content[0].text.strip().strip('"').strip("'")
-    except Exception:
-        query = "is:unread"
-
-    status_fn({"type": "tool_start", "tool": "search_gmail",
-               "label": f"Searching work Gmail: {query[:60]}..."})
-
-    # Search -- fall back to recent unread if nothing found.
-    results = search_gmail("work", query, max_results=3)
-    if results.get("error") or not results.get("results"):
-        status_fn({"type": "tool_start", "tool": "search_gmail",
-                   "label": "No results -- falling back to is:unread..."})
-        results = search_gmail("work", "is:unread", max_results=3)
-
-    if not results.get("results"):
-        status_fn({"type": "tool_done", "tool": "search_gmail",
-                   "label": "No matching emails found"})
-        return ""
-
-    count = results["count"]
-    status_fn({"type": "tool_done", "tool": "search_gmail",
-               "label": f"Found {count} email(s) -- reading thread..."})
-
-    # Read the most recent matching thread.
-    first = results["results"][0]
-    status_fn({"type": "tool_start", "tool": "read_email_thread",
-               "label": f"Reading thread: {first.get('subject', '')[:50]}..."})
-
-    thread = read_email_thread("work", first["thread_id"])
-    if thread.get("error") or not thread.get("messages"):
-        status_fn({"type": "tool_done", "tool": "read_email_thread",
-                   "label": "Could not read thread"})
-        return ""
-
-    msg_count = thread["message_count"]
-    status_fn({"type": "tool_done", "tool": "read_email_thread",
-               "label": f"Thread loaded ({msg_count} message(s)) -- injecting into session"})
-
-    lines = [f"[WORK GMAIL -- auto-fetched, query: {query}]"]
-    for msg in thread["messages"]:
-        lines.append(f"\nFrom: {msg['from']}")
-        lines.append(f"Date: {msg['date']}")
-        lines.append(f"Subject: {msg['subject']}")
-        lines.append(f"\n{msg['body']}")
-        lines.append("\n---")
-
-    return "\n".join(lines)
 
 
 def run(output_fn=None, input_fn=None, status_fn=None, stop_fn=None):
@@ -922,21 +757,6 @@ def run(output_fn=None, input_fn=None, status_fn=None, stop_fn=None):
                             rd = json.loads(content)
                             status_fn({"type": "create_agent_done", "agent": slug, "label": f"{rd.get('display_name', slug)} created and saved"})
 
-                        elif tc.name == "search_gmail":
-                            acct  = tc.input.get("account", "work")
-                            query = tc.input.get("query", "")
-                            status_fn({"type": "tool_start", "tool": "search_gmail", "label": f"Searching {acct} Gmail: {query[:60]}..."})
-                            content = _dispatch_tool(tc.name, tc.input)
-                            rd = json.loads(content)
-                            status_fn({"type": "tool_done", "tool": "search_gmail", "label": f"Found {rd.get('count', 0)} email(s)"})
-
-                        elif tc.name == "read_email_thread":
-                            acct = tc.input.get("account", "work")
-                            status_fn({"type": "tool_start", "tool": "read_email_thread", "label": f"Reading {acct} Gmail thread..."})
-                            content = _dispatch_tool(tc.name, tc.input)
-                            rd = json.loads(content)
-                            status_fn({"type": "tool_done", "tool": "read_email_thread", "label": f"Thread read ({rd.get('message_count', 0)} message(s))"})
-
                         elif tc.name == "list_agents":
                             status_fn({"type": "tool_start", "tool": "list_agents", "label": "Reading AgentLibrary..."})
                             content = _dispatch_tool(tc.name, tc.input)
@@ -1021,12 +841,6 @@ def run(output_fn=None, input_fn=None, status_fn=None, stop_fn=None):
                         break
                     if not user_input:
                         user_input = "(no input)"
-                    # Auto-inject work Gmail content if the message references email/alerts.
-                    email_ctx = _prefetch_email_context(user_input, client, status_fn)
-                    if email_ctx:
-                        status_fn({"type": "tool_done", "tool": "search_gmail",
-                                   "label": "Email content injected into session"})
-                        user_input = user_input + "\n\n" + email_ctx
 
                 messages.append({"role": "assistant", "content": response.content})
                 messages.append({"role": "user",      "content": user_input})

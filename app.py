@@ -16,8 +16,6 @@ import os
 import queue
 
 from flask import Flask, render_template, request, jsonify, Response
-from tools.gmail_tool import search_gmail, read_email_thread
-
 app = Flask(__name__)
 
 _session = None
@@ -53,43 +51,6 @@ def start():
     })
 
 
-_EMAIL_TRIGGERS = (
-    "email", "alert", "ticket", "notification", "inbox", "mail",
-    "check my", "the alert", "got a", "received a",
-)
-
-
-def _inject_gmail_context(message: str) -> str:
-    """If message references work email/alerts, fetch the most recent thread and append it."""
-    if not any(t in message.lower() for t in _EMAIL_TRIGGERS):
-        return message
-    try:
-        results = search_gmail("work", "is:unread", max_results=5)
-        if results.get("error") or not results.get("results"):
-            return message
-        first   = results["results"][0]
-        thread  = read_email_thread("work", first["thread_id"])
-        if thread.get("error") or not thread.get("messages"):
-            return message
-        lines = ["[WORK GMAIL -- auto-fetched]"]
-        for msg in thread["messages"]:
-            lines.append(f"\nFrom: {msg['from']}\nDate: {msg['date']}\nSubject: {msg['subject']}\n\n{msg['body']}\n---")
-        email_block = "\n".join(lines)
-        return (
-            "Here is a recent work email thread. Analyze it and route to the right specialist.\n\n"
-            + email_block
-        )
-    except Exception:
-        return message
-
-
-@app.route("/test-gmail")
-def test_gmail():
-    """Diagnostic: confirm Gmail injection works without involving the Orchestrator AI."""
-    result = _inject_gmail_context("check my work email for the alert")
-    return jsonify({"injected_length": len(result), "preview": result[:300]})
-
-
 @app.route("/stop", methods=["POST"])
 def stop():
     global _session
@@ -107,8 +68,6 @@ def reply():
     data        = request.get_json()
     message     = data.get("message", "").strip()
     attachments = data.get("attachments", [])
-
-    message = _inject_gmail_context(message)
 
     if attachments:
         content = []
